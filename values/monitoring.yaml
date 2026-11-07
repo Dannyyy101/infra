@@ -95,7 +95,9 @@ grafana:
       auth_url: https://auth.project101.tech/oauth/v2/authorize
       token_url: https://auth.project101.tech/oauth/v2/token
       api_url: https://auth.project101.tech/oidc/v1/userinfo
-      scopes: openid profile email
+      # the last scope makes zitadel put the project roles into the tokens and the userinfo,
+      # independent of the setting "assert roles on authentication" of the project
+      scopes: openid profile email urn:zitadel:iam:org:projects:roles
       use_pkce: true
       allow_sign_up: true
       # zitadel is shared with all users of labs-101: only the project role "admin" (zitadel project
