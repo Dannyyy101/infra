@@ -6,24 +6,20 @@ auth:
   # organization of the users in zitadel (not a secret), for the URLs of the profile pictures
   zitadelOrgId: "394480551534329860"
   audience: ""
-
 # keys see deploy/helm/labs-101/templates/secret.yaml, created once by hand (argocd/README.md)
 secrets:
   existingSecret: labs-101-secrets
-
 frontend:
   image:
-    tag: latest
+    tag: 33e84e07873faf918cf0f624a0a88e7b948fa29a
     pullPolicy: IfNotPresent
-
 backend:
   image:
-    tag: latest
+    tag: 33e84e07873faf918cf0f624a0a88e7b948fa29a
     pullPolicy: IfNotPresent
   metrics:
     serviceMonitor:
       enabled: true
-
 # routes come from the cloudflare tunnel, no ingress controller needed
 ingress:
   enabled: false
