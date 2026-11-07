@@ -11,11 +11,11 @@ secrets:
   existingSecret: labs-101-secrets
 frontend:
   image:
-    tag: 4d44b7d4a8a3c213e368a06adf5bbe6afef9ea9f
+    tag: 1f3a549a26539d9bdc09f6acc55cef108d6311c1
     pullPolicy: IfNotPresent
 backend:
   image:
-    tag: 4d44b7d4a8a3c213e368a06adf5bbe6afef9ea9f
+    tag: 1f3a549a26539d9bdc09f6acc55cef108d6311c1
     pullPolicy: IfNotPresent
   metrics:
     serviceMonitor:
