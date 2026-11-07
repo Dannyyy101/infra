@@ -23,6 +23,10 @@ zitadel:
     repository: ghcr.io/zitadel/zitadel
     tag: ""  # defaults to appVersion
     pullPolicy: IfNotPresent
+  # port of the kubernetes service, the address inside the cluster is
+  # http://<release>-zitadel.<namespace>.svc.cluster.local:<port>; zitadel itself listens on 8080
+  servicePort: 8085
+  # public port behind cloudflare / the ingress, not the port of the service
   externalPort: 443
   externalSecure: true
   # TLS is terminated by the ingress

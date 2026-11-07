@@ -11,7 +11,7 @@ spec:
     {{- include "auth.selectorLabels" (list . "zitadel") | nindent 4 }}
   ports:
     - name: http
-      port: 8080
+      port: {{ .Values.zitadel.servicePort }}
       targetPort: http
       appProtocol: kubernetes.io/h2c
 ---

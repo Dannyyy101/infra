@@ -31,7 +31,7 @@ tunnel:
 # the last rule catches everything else. originRequest: https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/configure-tunnels/origin-configuration/
 ingress: []
   # - hostname: auth.project101.tech
-  #   service: http://auth-zitadel.auth.svc.cluster.local:8080
+  #   service: http://auth-zitadel.auth.svc.cluster.local:8085
   #   originRequest:
   #     httpHostHeader: auth.project101.tech
 catchAll: http_status:404

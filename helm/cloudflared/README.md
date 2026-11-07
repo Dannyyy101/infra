@@ -33,7 +33,7 @@ kubectl -n cloudflare delete deploy cloudflared
 
 2. Route anlegen. Im Modus `token` im Dashboard unter Public Hostnames:
    - Subdomain `auth`, Domain `project101.tech`
-   - Service: `HTTP` → `auth-zitadel.auth.svc.cluster.local:8080`
+   - Service: `HTTP` → `auth-zitadel.auth.svc.cluster.local:8085`
    - Additional settings → HTTP Settings → HTTP Host Header: `auth.project101.tech`
 
    Im Modus `config` dasselbe in den values:
@@ -41,7 +41,7 @@ kubectl -n cloudflare delete deploy cloudflared
    ```yaml
    ingress:
      - hostname: auth.project101.tech
-       service: http://auth-zitadel.auth.svc.cluster.local:8080
+       service: http://auth-zitadel.auth.svc.cluster.local:8085
        originRequest:
          httpHostHeader: auth.project101.tech
    ```
