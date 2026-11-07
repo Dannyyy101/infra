@@ -1,0 +1,28 @@
+# chart from the app repo, environment (image tags, hosts, settings) from this repo:
+# the CI of labs-101 builds the images and writes their tags into values/labs-101.yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: labs-101
+  namespace: argocd
+spec:
+  project: default
+  sources:
+    - repoURL: https://github.com/Dannyyy101/labs-101.git
+      targetRevision: main
+      path: deploy/helm/labs-101
+      helm:
+        releaseName: labs-101
+        valueFiles:
+          - $values/values/labs-101.yaml
+    - repoURL: https://github.com/Dannyyy101/infra.git
+      targetRevision: main
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: labs-101
+  syncPolicy:
+    # manual sync until labs-101 has moved from docker compose into the cluster (argocd/README.md),
+    # then enable it: automated: {prune: false, selfHeal: true}; prune stays off because of postgres
+    syncOptions:
+      - CreateNamespace=true

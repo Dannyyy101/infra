@@ -1,0 +1,29 @@
+# labs-101 in production (chart deploy/helm/labs-101 of the app repo).
+# backend.image.tag and frontend.image.tag are written by the CI of labs-101 (workflow images.yaml),
+# every change of them is a commit here and argo cd deploys exactly that build
+
+auth:
+  # organization of the users in zitadel (not a secret), for the URLs of the profile pictures
+  zitadelOrgId: ""
+  audience: ""
+
+# keys see deploy/helm/labs-101/templates/secret.yaml, created once by hand (argocd/README.md)
+secrets:
+  existingSecret: labs-101-secrets
+
+frontend:
+  image:
+    tag: latest
+    pullPolicy: IfNotPresent
+
+backend:
+  image:
+    tag: latest
+    pullPolicy: IfNotPresent
+  metrics:
+    serviceMonitor:
+      enabled: true
+
+# routes come from the cloudflare tunnel, no ingress controller needed
+ingress:
+  enabled: false

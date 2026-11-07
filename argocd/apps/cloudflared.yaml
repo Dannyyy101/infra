@@ -1,0 +1,22 @@
+# same release name and namespace as the existing helm install, so argo cd adopts the resources
+# instead of creating a second tunnel connector
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cloudflared
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/Dannyyy101/infra.git
+    targetRevision: main
+    path: helm/cloudflared
+    helm:
+      releaseName: tunnel
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: cloudflare
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

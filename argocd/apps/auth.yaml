@@ -1,0 +1,28 @@
+# zitadel with its own postgres. Same release name as the existing helm install (resource names stay
+# auth-zitadel, auth-postgres, ...), the secrets come from the secret auth-secrets (see argocd/README.md)
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: auth
+  namespace: argocd
+spec:
+  project: default
+  sources:
+    - repoURL: https://github.com/Dannyyy101/infra.git
+      targetRevision: main
+      path: helm/auth
+      helm:
+        releaseName: auth
+        valueFiles:
+          - $values/values/auth.yaml
+    - repoURL: https://github.com/Dannyyy101/infra.git
+      targetRevision: main
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: auth
+  syncPolicy:
+    automated:
+      # stateful: removed resources are only reported, deleting them stays a manual decision
+      prune: false
+      selfHeal: true

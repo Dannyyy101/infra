@@ -1,0 +1,81 @@
+# argo cd (chart argo/argo-cd), reachable at https://argocd.project101.tech through the cloudflare tunnel,
+# sign in with zitadel. Secrets are not in this public repo, see argocd/README.md
+global:
+  domain: argocd.project101.tech
+
+configs:
+  params:
+    # TLS ends at cloudflare, the tunnel talks plain http to argocd-server
+    server.insecure: true
+  cm:
+    # the local admin only for the bootstrap and as a fallback, password in argocd-initial-admin-secret
+    admin.enabled: true
+    exec.enabled: false
+    # "$<secret>:<key>" is resolved by argo cd from a secret labeled app.kubernetes.io/part-of=argocd
+    oidc.config: |
+      name: Zitadel
+      issuer: https://auth.project101.tech
+      clientID: $argocd-oidc:clientID
+      clientSecret: $argocd-oidc:clientSecret
+      requestedScopes: ["openid", "profile", "email"]
+  rbac:
+    # zitadel is shared with all users of labs-101, so signing in grants nothing by default
+    policy.default: ""
+    # sub claim = id of the user in zitadel (Users → the user → ID), no email in this public repo
+    policy.csv: |
+      g, REPLACE_WITH_ZITADEL_USER_ID, role:admin
+
+# sign in goes directly to zitadel, dex is not needed
+dex:
+  enabled: false
+
+# app of apps only, no generators
+applicationSet:
+  replicas: 0
+
+notifications:
+  enabled: false
+
+controller:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 1Gi
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+
+server:
+  resources:
+    requests:
+      cpu: 25m
+      memory: 64Mi
+    limits:
+      memory: 256Mi
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+
+repoServer:
+  resources:
+    requests:
+      cpu: 25m
+      memory: 128Mi
+    limits:
+      memory: 512Mi
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+
+redis:
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      memory: 128Mi

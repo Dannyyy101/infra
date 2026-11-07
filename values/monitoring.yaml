@@ -1,0 +1,110 @@
+# kube-prometheus-stack on single node k3s: prometheus scrapes every ServiceMonitor/PodMonitor of the
+# cluster, grafana at https://grafana.project101.tech (sign in with zitadel). Secrets: argocd/README.md
+
+# k3s runs etcd, scheduler, controller-manager and kube-proxy inside the k3s process, their own
+# endpoints don't exist, scraping them would only produce permanently failing targets and alerts
+kubeEtcd:
+  enabled: false
+kubeControllerManager:
+  enabled: false
+kubeScheduler:
+  enabled: false
+kubeProxy:
+  enabled: false
+
+defaultRules:
+  rules:
+    etcd: false
+    kubeControllerManager: false
+    kubeSchedulerAlerting: false
+    kubeSchedulerRecording: false
+    kubeProxy: false
+    windows: false
+
+# nobody receives alerts yet, it follows together with a receiver (e.g. ntfy or telegram)
+alertmanager:
+  enabled: false
+
+prometheus:
+  prometheusSpec:
+    # the default only selects monitors with the label release=monitoring, apps bring their own
+    serviceMonitorSelectorNilUsesHelmValues: false
+    podMonitorSelectorNilUsesHelmValues: false
+    ruleSelectorNilUsesHelmValues: false
+    probeSelectorNilUsesHelmValues: false
+    scrapeInterval: 30s
+    retention: 15d
+    retentionSize: 8GB
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 10Gi
+    resources:
+      requests:
+        cpu: 100m
+        memory: 512Mi
+      limits:
+        memory: 1536Mi
+
+prometheusOperator:
+  resources:
+    requests:
+      cpu: 20m
+      memory: 64Mi
+    limits:
+      memory: 256Mi
+
+kube-state-metrics:
+  resources:
+    requests:
+      cpu: 10m
+      memory: 64Mi
+    limits:
+      memory: 256Mi
+
+prometheus-node-exporter:
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      memory: 128Mi
+
+grafana:
+  defaultDashboardsTimezone: Europe/Berlin
+  # helm test pod, argo cd would keep it as a regular resource
+  testFramework:
+    enabled: false
+  # secret grafana-admin with admin-user and admin-password, the local admin is the fallback
+  admin:
+    existingSecret: grafana-admin
+  # secret grafana-oidc with GF_AUTH_GENERIC_OAUTH_CLIENT_ID and GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET
+  envFromSecret: grafana-oidc
+  persistence:
+    enabled: true
+    size: 1Gi
+  grafana.ini:
+    server:
+      root_url: https://grafana.project101.tech
+    auth.generic_oauth:
+      enabled: true
+      name: Zitadel
+      auth_url: https://auth.project101.tech/oauth/v2/authorize
+      token_url: https://auth.project101.tech/oauth/v2/token
+      api_url: https://auth.project101.tech/oidc/v1/userinfo
+      scopes: openid profile email
+      use_pkce: true
+      allow_sign_up: true
+      # zitadel is shared with all users of labs-101: only the project role "admin" (zitadel project
+      # with "assert roles on authentication") gets in, everyone else is rejected by the strict mode
+      role_attribute_path: contains(keys("urn:zitadel:iam:org:project:roles" || `{}`), 'admin') && 'Admin' || ''
+      role_attribute_strict: true
+  resources:
+    requests:
+      cpu: 25m
+      memory: 128Mi
+    limits:
+      memory: 384Mi

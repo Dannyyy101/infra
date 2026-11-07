@@ -1,0 +1,7 @@
+# zitadel in production (chart helm/auth). The secrets are in the secret auth-secrets, created once
+# by hand (argocd/README.md), TLS ends at cloudflare, so no ingress
+secrets:
+  existingSecret: auth-secrets
+
+ingress:
+  enabled: false

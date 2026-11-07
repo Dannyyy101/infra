@@ -1,0 +1,30 @@
+# prometheus, grafana, node-exporter and kube-state-metrics; every ServiceMonitor of the cluster is scraped
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: monitoring
+  namespace: argocd
+spec:
+  project: default
+  sources:
+    - repoURL: https://prometheus-community.github.io/helm-charts
+      chart: kube-prometheus-stack
+      targetRevision: 92.22.0
+      helm:
+        releaseName: monitoring
+        valueFiles:
+          - $values/values/monitoring.yaml
+    - repoURL: https://github.com/Dannyyy101/infra.git
+      targetRevision: main
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      # the CRDs of the prometheus operator are too large for the annotation of a client side apply
+      - ServerSideApply=true

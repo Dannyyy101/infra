@@ -1,0 +1,30 @@
+# argo cd manages itself: installed once with helm (see argocd/README.md), afterwards
+# a change of values/argocd.yaml or of the chart version is deployed like every other app
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: argocd
+  namespace: argocd
+spec:
+  project: default
+  sources:
+    - repoURL: https://argoproj.github.io/argo-helm
+      chart: argo-cd
+      targetRevision: 10.14.0
+      helm:
+        releaseName: argocd
+        valueFiles:
+          - $values/values/argocd.yaml
+    - repoURL: https://github.com/Dannyyy101/infra.git
+      targetRevision: main
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      # never delete parts of argo cd itself because of a broken commit
+      prune: false
+      selfHeal: true
+    syncOptions:
+      - ServerSideApply=true
