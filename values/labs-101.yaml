@@ -20,6 +20,8 @@ backend:
   metrics:
     serviceMonitor:
       enabled: true
+    dashboard:
+      enabled: true
 # routes come from the cloudflare tunnel, no ingress controller needed
 ingress:
   enabled: false
