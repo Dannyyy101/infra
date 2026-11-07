@@ -17,6 +17,8 @@ secrets:
   adminPassword: ""
 
 zitadel:
+  # false starts only the database, e.g. to restore a dump before zitadel's first start
+  enabled: true
   image:
     repository: ghcr.io/zitadel/zitadel
     tag: ""  # defaults to appVersion

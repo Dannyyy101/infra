@@ -1,3 +1,4 @@
+{{- if .Values.zitadel.enabled }}
 {{- $name := printf "%s-zitadel" (include "auth.fullname" .) }}
 apiVersion: v1
 kind: Service
@@ -105,3 +106,4 @@ spec:
             periodSeconds: 30
           resources:
             {{- toYaml .Values.zitadel.resources | nindent 12 }}
+{{- end }}

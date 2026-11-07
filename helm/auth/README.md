@@ -27,13 +27,14 @@ helm upgrade --install auth helm/auth -n auth --create-namespace -f helm/auth/va
 
 ## Umzug der bestehenden Instanz aus labs-101
 
-Zitadel liegt bisher in der Datenbank `zitadel` des labs-101-Postgres. Damit Nutzer, Clients und
-Secrets erhalten bleiben:
+Kurzfassung, die Befehle im Detail siehe Chat/Doku:
 
-1. Dump: `pg_dump -Fc -d zitadel > zitadel.dump` (auf dem alten Server)
-2. Chart mit **demselben Masterkey** installieren, Zitadel auf 0 skalieren
-   (`kubectl -n auth scale deploy auth-zitadel --replicas=0`)
-3. Datenbank leeren und einspielen: `pg_restore --clean --if-exists -d zitadel zitadel.dump`
-4. Zitadel wieder auf 1 skalieren, `start-from-init` führt nur noch Migrationen aus
+1. Masterkey der alten Instanz übernehmen, Postgres-Major-Version mindestens wie die alte
+2. Chart mit `--set zitadel.enabled=false` installieren (nur Postgres)
+3. Rolle und Datenbank `zitadel` anlegen (Passwort = `secrets.zitadelDbPassword`)
+4. Alte Zitadel stoppen, `pg_dump -Fc -d zitadel` → `pg_restore --no-owner --no-privileges --role=zitadel -d zitadel`
+5. `helm upgrade ... --set zitadel.enabled=true`, `start-from-init` führt nur noch Migrationen aus
+6. Route von `auth.project101.tech` auf den neuen Service umstellen
+7. Zitadel aus dem produktiven `docker-compose.yml` von labs-101 entfernen
 
 Die Werte unter `zitadel.firstInstance` greifen nur bei einer leeren Datenbank.
