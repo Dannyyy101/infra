@@ -22,7 +22,9 @@ spec:
     server: https://kubernetes.default.svc
     namespace: labs-101
   syncPolicy:
-    # manual sync until labs-101 has moved from docker compose into the cluster (argocd/README.md),
-    # then enable it: automated: {prune: false, selfHeal: true}; prune stays off because of postgres
+    automated:
+      # stateful (postgres), removed resources are only reported, deleting them stays a manual decision
+      prune: false
+      selfHeal: true
     syncOptions:
       - CreateNamespace=true
