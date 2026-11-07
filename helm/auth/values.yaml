@@ -1,0 +1,72 @@
+# public host of zitadel, every app uses https://<host> as issuer
+host: auth.project101.tech
+
+imagePullSecrets: []
+
+# set them in a values file that is not committed (values-*.local.yaml) or create the secret
+# yourself with the same keys (see templates/secret.yaml) and name it in existingSecret
+secrets:
+  existingSecret: ""
+  # exactly 32 characters, encrypts the secrets in the zitadel database, never change it later
+  masterkey: ""
+  # superuser of the database, zitadel creates its own user and database with it
+  postgresUsername: ""
+  postgresPassword: ""
+  zitadelDbPassword: ""
+  # first admin of the first instance
+  adminPassword: ""
+
+zitadel:
+  image:
+    repository: ghcr.io/zitadel/zitadel
+    tag: ""  # defaults to appVersion
+    pullPolicy: IfNotPresent
+  externalPort: 443
+  externalSecure: true
+  # TLS is terminated by the ingress
+  tlsMode: external
+  # only used on the very first start, the admin logs in as <adminUsername>@<orgName>.<host>
+  firstInstance:
+    orgName: project101
+    adminUsername: admin
+    passwordChangeRequired: true
+  # the login built into zitadel, saves the extra deployment of the new login v2
+  loginV2Required: false
+  extraEnv: []
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 512Mi
+
+postgres:
+  # false to use an external database, then set host
+  enabled: true
+  host: ""
+  port: 5432
+  sslMode: disable
+  image:
+    repository: postgres
+    tag: "18"
+    pullPolicy: IfNotPresent
+  persistence:
+    size: 5Gi
+    storageClass: ""
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      memory: 512Mi
+
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    # zitadel speaks gRPC and HTTP on one port, the ingress has to forward h2c
+    nginx.ingress.kubernetes.io/backend-protocol: GRPC
+    # e.g. cert-manager.io/cluster-issuer: letsencrypt
+  tls:
+    enabled: true
+    secretName: auth-tls

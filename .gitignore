@@ -1,0 +1,46 @@
+# os / editor
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# terraform: state contains secrets in plain text (e.g. generated ssh and tls keys)
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+*.tfplan
+tfplan
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraformrc
+terraform.rc
+# variables with credentials (tenancy, user, fingerprint, ...), commit an *.tfvars.example instead
+*.tfvars
+*.tfvars.json
+!*.tfvars.example
+# the lock file is committed on purpose, it pins the provider versions
+!.terraform.lock.hcl
+
+# keys and certificates (oci api key, ssh keys, kubeconfig)
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa*
+id_ed25519*
+kubeconfig
+*.kubeconfig
+
+# helm: values files with secrets, packaged charts and pulled dependencies
+values-*.local.yaml
+*.tgz
+helm/**/charts/
+
+# env files
+.env
+.env.*
+!.env.example

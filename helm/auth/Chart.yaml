@@ -1,0 +1,6 @@
+apiVersion: v2
+name: auth
+description: Zitadel as the shared identity provider of all apps, with its own PostgreSQL
+type: application
+version: 0.1.0
+appVersion: "v4.19.4"

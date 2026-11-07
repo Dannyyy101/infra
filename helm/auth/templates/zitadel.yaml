@@ -1,0 +1,107 @@
+{{- $name := printf "%s-zitadel" (include "auth.fullname" .) }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "auth.labels" . | nindent 4 }}
+spec:
+  selector:
+    {{- include "auth.selectorLabels" (list . "zitadel") | nindent 4 }}
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+      appProtocol: kubernetes.io/h2c
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "auth.labels" . | nindent 4 }}
+    {{- include "auth.selectorLabels" (list . "zitadel") | nindent 4 }}
+spec:
+  # start-from-init sets up database and first instance, two pods must not do that at the same time
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "auth.selectorLabels" (list . "zitadel") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "auth.selectorLabels" (list . "zitadel") | nindent 8 }}
+      annotations:
+        checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: zitadel
+          image: "{{ .Values.zitadel.image.repository }}:{{ .Values.zitadel.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.zitadel.image.pullPolicy }}
+          args:
+            - start-from-init
+            - --masterkeyFromEnv
+            - --tlsMode
+            - {{ .Values.zitadel.tlsMode | quote }}
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            {{- include "auth.secretEnv" (list . "ZITADEL_MASTERKEY" "ZITADEL_MASTERKEY") | nindent 12 }}
+            - name: ZITADEL_EXTERNALDOMAIN
+              value: {{ .Values.host | quote }}
+            - name: ZITADEL_EXTERNALPORT
+              value: {{ .Values.zitadel.externalPort | quote }}
+            - name: ZITADEL_EXTERNALSECURE
+              value: {{ .Values.zitadel.externalSecure | quote }}
+            - name: ZITADEL_DATABASE_POSTGRES_HOST
+              value: {{ include "auth.postgresHost" . | quote }}
+            - name: ZITADEL_DATABASE_POSTGRES_PORT
+              value: {{ .Values.postgres.port | quote }}
+            - name: ZITADEL_DATABASE_POSTGRES_DATABASE
+              value: zitadel
+            - name: ZITADEL_DATABASE_POSTGRES_USER_USERNAME
+              value: zitadel
+            {{- include "auth.secretEnv" (list . "ZITADEL_DATABASE_POSTGRES_USER_PASSWORD" "ZITADEL_DB_PASSWORD") | nindent 12 }}
+            - name: ZITADEL_DATABASE_POSTGRES_USER_SSL_MODE
+              value: {{ .Values.postgres.sslMode | quote }}
+            {{- include "auth.secretEnv" (list . "ZITADEL_DATABASE_POSTGRES_ADMIN_USERNAME" "POSTGRES_USERNAME") | nindent 12 }}
+            {{- include "auth.secretEnv" (list . "ZITADEL_DATABASE_POSTGRES_ADMIN_PASSWORD" "POSTGRES_PASSWORD") | nindent 12 }}
+            - name: ZITADEL_DATABASE_POSTGRES_ADMIN_SSL_MODE
+              value: {{ .Values.postgres.sslMode | quote }}
+            - name: ZITADEL_FIRSTINSTANCE_ORG_NAME
+              value: {{ .Values.zitadel.firstInstance.orgName | quote }}
+            - name: ZITADEL_FIRSTINSTANCE_ORG_HUMAN_USERNAME
+              value: {{ .Values.zitadel.firstInstance.adminUsername | quote }}
+            {{- include "auth.secretEnv" (list . "ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORD" "ZITADEL_ADMIN_PASSWORD") | nindent 12 }}
+            - name: ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORDCHANGEREQUIRED
+              value: {{ .Values.zitadel.firstInstance.passwordChangeRequired | quote }}
+            - name: ZITADEL_DEFAULTINSTANCE_FEATURES_LOGINV2_REQUIRED
+              value: {{ .Values.zitadel.loginV2Required | quote }}
+            {{- with .Values.zitadel.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          startupProbe:
+            httpGet:
+              path: /debug/ready
+              port: http
+            periodSeconds: 5
+            failureThreshold: 60
+          readinessProbe:
+            httpGet:
+              path: /debug/ready
+              port: http
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /debug/healthz
+              port: http
+            periodSeconds: 30
+          resources:
+            {{- toYaml .Values.zitadel.resources | nindent 12 }}

@@ -1,0 +1,5 @@
+Zitadel: https://{{ .Values.host }}/ui/console
+Issuer for the apps (AUTH_ISSUER): https://{{ .Values.host }}
+First admin: {{ .Values.zitadel.firstInstance.adminUsername }}@{{ .Values.zitadel.firstInstance.orgName }}.{{ .Values.host }}
+
+  kubectl -n {{ .Release.Namespace }} get pods -l app.kubernetes.io/instance={{ .Release.Name }} -w

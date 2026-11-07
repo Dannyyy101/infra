@@ -1,0 +1,8 @@
+# copy to terraform.tfvars and fill in, values from the OCI console:
+# profile → My profile → API keys (user, fingerprint, tenancy) and Identity → Compartments
+tenancy_ocid     = "ocid1.tenancy.oc1..xxxxxxxx"
+compartment_ocid = "ocid1.tenancy.oc1..xxxxxxxx"
+user_ocid        = "ocid1.user.oc1..xxxxxxxx"
+fingerprint      = "aa:bb:cc:dd:ee:ff:00:11:22:33:44:55:66:77:88:99"
+private_key_path = "path/to/oci-api-key.pem"
+region           = "eu-frankfurt-1"
