@@ -4,7 +4,7 @@
 
 auth:
   # organization of the users in zitadel (not a secret), for the URLs of the profile pictures
-  zitadelOrgId: ""
+  zitadelOrgId: "394480551534329860"
   audience: ""
 
 # keys see deploy/helm/labs-101/templates/secret.yaml, created once by hand (argocd/README.md)
