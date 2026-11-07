@@ -1,0 +1,15 @@
+{{- if eq .Values.tunnel.mode "config" }}
+{{- $config := dict
+  "tunnel" (required "tunnel.id is required in mode config" .Values.tunnel.id)
+  "credentials-file" (printf "/etc/cloudflared/credentials/%s" .Values.tunnel.credentials.key)
+  "ingress" (append (.Values.ingress | default list) (dict "service" .Values.catchAll)) }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "cloudflared.fullname" . }}
+  labels:
+    {{- include "cloudflared.labels" . | nindent 4 }}
+data:
+  config.yaml: |
+    {{- toYaml $config | nindent 4 }}
+{{- end }}

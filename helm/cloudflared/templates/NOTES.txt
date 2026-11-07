@@ -1,0 +1,13 @@
+cloudflared runs with {{ .Values.replicaCount }} replicas in mode {{ .Values.tunnel.mode }}.
+{{- if eq .Values.tunnel.mode "token" }}
+The routes (public hostnames) are set in the Cloudflare dashboard: Zero Trust → Networks → Tunnels.
+{{- else }}
+Routes:
+{{- range .Values.ingress }}
+  {{ .hostname | default "*" }} → {{ .service }}
+{{- end }}
+  everything else → {{ .Values.catchAll }}
+DNS: cloudflared tunnel route dns {{ .Values.tunnel.id }} <hostname>
+{{- end }}
+
+  kubectl -n {{ .Release.Namespace }} logs -l app.kubernetes.io/instance={{ .Release.Name }} -f

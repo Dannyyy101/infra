@@ -1,0 +1,56 @@
+replicaCount: 2
+
+image:
+  repository: cloudflare/cloudflared
+  tag: ""  # defaults to appVersion
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+
+tunnel:
+  # token:  the routes (public hostnames) are set in the Cloudflare dashboard,
+  #         only the token of the tunnel is needed
+  # config: the routes are set below in ingress, needs the credentials file of the tunnel
+  mode: token
+
+  # mode token: secret with the token (Zero Trust → Networks → Tunnels → the tunnel → token)
+  token:
+    # set value to let the chart create the secret, or leave it empty and name an existing secret
+    value: ""
+    existingSecret: tunnel-token
+    key: token
+
+  # mode config: id of the tunnel and secret with its credentials file
+  # (cloudflared tunnel create <name> writes ~/.cloudflared/<id>.json)
+  id: ""
+  credentials:
+    existingSecret: tunnel-credentials
+    key: credentials.json
+
+# mode config only: routes from public hostnames to services in the cluster, in this order,
+# the last rule catches everything else. originRequest: https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/configure-tunnels/origin-configuration/
+ingress: []
+  # - hostname: auth.project101.tech
+  #   service: http://auth-zitadel.auth.svc.cluster.local:8080
+  #   originRequest:
+  #     httpHostHeader: auth.project101.tech
+catchAll: http_status:404
+
+# quic is faster, http2 works where outgoing UDP is blocked
+protocol: auto
+logLevel: info
+extraArgs: []
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+resources:
+  requests:
+    cpu: 10m
+    memory: 32Mi
+  limits:
+    memory: 128Mi
+
+nodeSelector: {}
+tolerations: []
