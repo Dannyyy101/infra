@@ -23,7 +23,7 @@ configs:
     policy.default: ""
     # sub claim = id of the user in zitadel (Users → the user → ID), no email in this public repo
     policy.csv: |
-      g, REPLACE_WITH_ZITADEL_USER_ID, role:admin
+      g, 394480551534854148, role:admin
 
 # sign in goes directly to zitadel, dex is not needed
 dex:
