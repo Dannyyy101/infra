@@ -70,6 +70,9 @@ spec:
             - name: http
               containerPort: 3000
           env:
+            # kubernetes setzt HOSTNAME auf den Pod-Namen, Next.js würde dann nur auf der Pod-IP lauschen
+            - name: HOSTNAME
+              value: "0.0.0.0"
             - name: APP_URL
               value: {{ printf "https://%s" .Values.host | quote }}
             - name: AUTH_ISSUER
