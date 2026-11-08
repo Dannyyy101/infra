@@ -155,14 +155,20 @@ Rückweg bis Schritt 6: Routen zurück auf die compose-Container stellen und `do
 rezepte lief per `docker compose` auf home-server (`~/home/projects/rezepte`, Container `rezepte-app`,
 `rezepte-db`), die Bilder lagen auf der Platte unter `public/uploads`.
 
+Erledigt am 2026-11-08 (Dump unter `~/rezepte-umzug` auf home-server). Zum Wiederholen, z. B. wenn in der alten
+App danach noch Rezepte dazugekommen sind:
+
 ```sh
-# Datenbank
+# Datenbank: die neue App kann laufen, --clean ersetzt die Tabellen. Die Bewertungen gibt es nur in der neuen
+# App und hängen an den Rezepten, ohne das DROP scheitert --clean (die App legt die Tabelle beim Start neu an)
 docker exec rezepte-db pg_dump -U rezepte -Fc rezepte > rezepte.dump
-kubectl -n rezepte scale deploy/rezepte --replicas=0
-kubectl -n rezepte exec -i rezepte-postgres-0 -- pg_restore -U rezepte -d rezepte --clean --if-exists --no-owner < rezepte.dump
-# Bilder ins Volume rezepte-uploads (Pfade in der Datenbank bleiben /uploads/<datei>)
-tar -C ~/home/projects/rezepte/public/uploads -cf - . | kubectl -n rezepte exec -i deploy/rezepte -- tar -C /app/public/uploads -xf -
-kubectl -n rezepte scale deploy/rezepte --replicas=1
+kubectl -n rezepte exec rezepte-postgres-0 -- psql -U rezepte -d rezepte -c 'DROP TABLE IF EXISTS bewertungen'
+kubectl -n rezepte exec -i rezepte-postgres-0 -- \
+  pg_restore -U rezepte -d rezepte --clean --if-exists --no-owner --no-acl < rezepte.dump
+
+# Bilder ins Volume rezepte-uploads, die Pfade in der Datenbank bleiben /uploads/<datei>
+tar -C ~/home/projects/rezepte/public/uploads --exclude=.gitkeep -cf - . \
+  | kubectl -n rezepte exec -i deploy/rezepte -- tar -C /app/public/uploads -xf -
 ```
 
 Danach die Route `rezepte.project101.tech` im Tunnel auf den Service umstellen und `docker compose down` in
