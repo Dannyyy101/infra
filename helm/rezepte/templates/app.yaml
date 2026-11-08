@@ -73,6 +73,11 @@ spec:
             # kubernetes setzt HOSTNAME auf den Pod-Namen, Next.js würde dann nur auf der Pod-IP lauschen
             - name: HOSTNAME
               value: "0.0.0.0"
+            # Node gibt beim Wählen zwischen IPv4 und IPv6 jedem Verbindungsversuch nur 250 ms. Der Weg zu
+            # Zitadel (über Cloudflare) dauert oft länger, IPv6 gibt es im Cluster nicht: der Login scheiterte
+            # dann mit ETIMEDOUT
+            - name: NODE_OPTIONS
+              value: "--network-family-autoselection-attempt-timeout=2000"
             - name: APP_URL
               value: {{ printf "https://%s" .Values.host | quote }}
             - name: AUTH_ISSUER
