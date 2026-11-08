@@ -5,4 +5,4 @@ host: rezepte.project101.tech
 secrets:
   existingSecret: rezepte-secrets
 image:
-  tag: a7910a8896e0fce0ec929eaa0e16d11f43d766a5
+  tag: 35927b7bb06745fc5b98b4f34d93f464680d4227
