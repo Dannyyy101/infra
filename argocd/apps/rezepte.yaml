@@ -1,0 +1,30 @@
+# rezeptbuch with its own postgres and a volume for the uploaded pictures,
+# the CI of Dannyyy101/rezepte writes the image tag into values/rezepte.yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: rezepte
+  namespace: argocd
+spec:
+  project: default
+  sources:
+    - repoURL: https://github.com/Dannyyy101/infra.git
+      targetRevision: main
+      path: helm/rezepte
+      helm:
+        releaseName: rezepte
+        valueFiles:
+          - $values/values/rezepte.yaml
+    - repoURL: https://github.com/Dannyyy101/infra.git
+      targetRevision: main
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: rezepte
+  syncPolicy:
+    automated:
+      # stateful (postgres, uploads), removed resources are only reported, deleting them stays a manual decision
+      prune: false
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

@@ -16,6 +16,7 @@ values/*.yaml             die Werte pro Komponente (Produktion, ohne Secrets)
 | `auth` | `helm/auth` | `auth` | `auth` |
 | `monitoring` | `prometheus-community/kube-prometheus-stack` | `monitoring` | `monitoring` |
 | `labs-101` | `deploy/helm/labs-101` aus dem App-Repo | `labs-101` | `labs-101` |
+| `rezepte` | `helm/rezepte` | `rezepte` | `rezepte` |
 
 Die Release-Namen entsprechen den bisherigen `helm install`, dadurch bleiben die Ressourcennamen gleich und
 Argo CD übernimmt die laufenden Ressourcen, statt sie neu anzulegen (wichtig für die PVCs der Datenbanken).
@@ -23,6 +24,9 @@ Argo CD übernimmt die laufenden Ressourcen, statt sie neu anzulegen (wichtig f�
 **Deployments von labs-101:** Die CI im App-Repo (`.github/workflows/images.yaml`) baut die Images mit dem
 Commit-SHA als Tag und committet die Tags nach `values/labs-101.yaml`. Argo CD deployt genau diesen Stand.
 Ein Rollback ist ein `git revert` dieses Commits.
+
+**Deployments von rezepte:** genauso, die CI von `Dannyyy101/rezepte` (`.github/workflows/image.yaml`) schreibt
+`image.tag` in `values/rezepte.yaml`. Das Chart liegt hier unter `helm/rezepte`.
 
 ## Secrets
 
@@ -55,6 +59,13 @@ kubectl -n labs-101 create secret generic labs-101-secrets \
   --from-literal=POSTGRES_USERNAME=... --from-literal=POSTGRES_PASSWORD=... \
   --from-literal=AUTH_CLIENT_ID=... --from-literal=AUTH_CLIENT_SECRET=... --from-literal=AUTH_SECRET=... \
   --from-literal=GEMINI_API_KEY=... --from-literal=CALENDAR_ENCRYPTION_KEY=...
+
+# rezepte: Client der Application "Rezepte" in Zitadel (siehe unten), der Rest zufällig
+kubectl create namespace rezepte
+kubectl -n rezepte create secret generic rezepte-secrets \
+  --from-literal=POSTGRES_PASSWORD="$(openssl rand -hex 24)" --from-literal=AUTH_SECRET="$(openssl rand -base64 32)" \
+  --from-literal=AUTH_CLIENT_ID=... --from-literal=AUTH_CLIENT_SECRET=...
+# nach einer Änderung am Secret: kubectl -n rezepte rollout restart deploy/rezepte
 ```
 
 Den Namen des bisherigen Zitadel-Secrets vorher mit `kubectl -n auth get secrets` prüfen.
@@ -72,6 +83,17 @@ Zitadel ist mit allen Nutzern von labs-101 geteilt. Ohne Einschränkung könnte 
    - Grafana, Redirect URI `https://grafana.project101.tech/login/generic_oauth`
 4. Deine User-ID (Users → du → ID) in `values/argocd.yaml` bei `REPLACE_WITH_ZITADEL_USER_ID` eintragen.
    Argo CD prüft zusätzlich selbst: Ohne diesen Eintrag hat auch ein angemeldeter Nutzer keine Rechte.
+
+## Zitadel: Login für rezepte
+
+Alle Nutzer von Zitadel dürfen ins Rezeptbuch, es gibt keine Rollen.
+
+1. Neues Projekt `rezepte` anlegen (ohne "Check authorization on Authentication").
+2. Application vom Typ Web, Code Flow, Client Secret (Basic):
+   - Redirect URI `https://rezepte.project101.tech/auth/callback`
+   - Post Logout URI `https://rezepte.project101.tech/anmelden`
+   - Refresh Token an (Token-Einstellungen der Application)
+3. Client-ID und -Secret in `rezepte-secrets` eintragen (oben) und `rollout restart`.
 
 ## Bootstrap
 
@@ -97,6 +119,7 @@ Im Dashboard (Modus `token`) unter Public Hostnames:
 | `grafana.project101.tech` | `http://monitoring-grafana.monitoring.svc.cluster.local:80` |
 | `api.project101.tech` | `http://labs-101-backend.labs-101.svc.cluster.local:8080` (erst beim Umzug) |
 | `project101.tech` | `http://labs-101-frontend.labs-101.svc.cluster.local:3000` (erst beim Umzug) |
+| `rezepte.project101.tech` | `http://rezepte.rezepte.svc.cluster.local:3000` |
 
 Der Management-Port des Backends (9090, `/actuator`) bekommt bewusst keine Route.
 
@@ -126,3 +149,21 @@ noch nicht automatisch.
    stoppen. Den Dump und das Volume erst nach ein paar Tagen ohne Probleme entfernen.
 
 Rückweg bis Schritt 6: Routen zurück auf die compose-Container stellen und `docker start spring-boot-labs-101`.
+
+## Umzug von rezepte aus docker compose
+
+rezepte lief per `docker compose` auf home-server (`~/home/projects/rezepte`, Container `rezepte-app`,
+`rezepte-db`), die Bilder lagen auf der Platte unter `public/uploads`.
+
+```sh
+# Datenbank
+docker exec rezepte-db pg_dump -U rezepte -Fc rezepte > rezepte.dump
+kubectl -n rezepte scale deploy/rezepte --replicas=0
+kubectl -n rezepte exec -i rezepte-postgres-0 -- pg_restore -U rezepte -d rezepte --clean --if-exists --no-owner < rezepte.dump
+# Bilder ins Volume rezepte-uploads (Pfade in der Datenbank bleiben /uploads/<datei>)
+tar -C ~/home/projects/rezepte/public/uploads -cf - . | kubectl -n rezepte exec -i deploy/rezepte -- tar -C /app/public/uploads -xf -
+kubectl -n rezepte scale deploy/rezepte --replicas=1
+```
+
+Danach die Route `rezepte.project101.tech` im Tunnel auf den Service umstellen und `docker compose down` in
+`~/home/projects/rezepte` (das Volume `rezepte_rezepte-daten` erst nach ein paar Tagen löschen).

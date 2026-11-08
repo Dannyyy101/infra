@@ -1,0 +1,56 @@
+# öffentliche URL der App, Zitadel leitet zurück auf https://<host>/auth/callback
+host: rezepte.project101.tech
+
+image:
+  repository: ghcr.io/dannyyy101/rezepte
+  # schreibt die CI des App-Repos (Commit-SHA), siehe values/rezepte.yaml
+  tag: latest
+  pullPolicy: IfNotPresent
+imagePullSecrets: []
+
+# Secrets entweder hier setzen (nicht committen!) oder selbst anlegen und in existingSecret nennen.
+# Keys: POSTGRES_PASSWORD, AUTH_CLIENT_ID, AUTH_CLIENT_SECRET, AUTH_SECRET
+secrets:
+  existingSecret: ""
+  postgresPassword: ""
+  # Application in Zitadel (Web, Code Flow, Client Secret Basic)
+  authClientId: ""
+  authClientSecret: ""
+  # verschlüsselt das Session-Cookie, mindestens 32 zufällige Zeichen
+  authSecret: ""
+
+auth:
+  # öffentliche URL von Zitadel (helm/auth), muss zum iss der Tokens passen
+  issuer: https://auth.project101.tech
+
+app:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 192Mi
+    limits:
+      # sharp und heic-convert brauchen bei großen Fotos kurz viel Speicher
+      memory: 768Mi
+  extraEnv: []
+
+# hochgeladene Bilder (public/uploads der App)
+uploads:
+  size: 5Gi
+  storageClass: ""
+
+postgres:
+  username: rezepte
+  database: rezepte
+  image:
+    repository: postgres
+    tag: "17-alpine"
+    pullPolicy: IfNotPresent
+  persistence:
+    size: 2Gi
+    storageClass: ""
+  resources:
+    requests:
+      cpu: 25m
+      memory: 64Mi
+    limits:
+      memory: 512Mi

@@ -1,0 +1,8 @@
+# rezepte in production (chart helm/rezepte). image.tag is written by the CI of the app repo
+# (Dannyyy101/rezepte, workflow image.yaml), every change of it is a commit here and argo cd deploys exactly that build
+host: rezepte.project101.tech
+# keys see helm/rezepte/templates/secret.yaml, created once by hand (argocd/README.md)
+secrets:
+  existingSecret: rezepte-secrets
+image:
+  tag: latest

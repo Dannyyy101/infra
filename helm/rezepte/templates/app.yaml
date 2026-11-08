@@ -1,0 +1,113 @@
+{{- $name := include "rezepte.fullname" . }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "rezepte.labels" . | nindent 4 }}
+spec:
+  selector:
+    {{- include "rezepte.selectorLabels" (list . "app") | nindent 4 }}
+  ports:
+    - name: http
+      port: 3000
+      targetPort: http
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ $name }}-uploads
+  labels:
+    {{- include "rezepte.labels" . | nindent 4 }}
+  annotations:
+    # die Bilder überleben auch das Löschen der Application
+    helm.sh/resource-policy: keep
+spec:
+  accessModes: ["ReadWriteOnce"]
+  {{- with .Values.uploads.storageClass }}
+  storageClassName: {{ . }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.uploads.size }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "rezepte.labels" . | nindent 4 }}
+    {{- include "rezepte.selectorLabels" (list . "app") | nindent 4 }}
+spec:
+  replicas: 1
+  # das Uploads-Volume ist ReadWriteOnce, der alte Pod muss es erst freigeben
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "rezepte.selectorLabels" (list . "app") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "rezepte.selectorLabels" (list . "app") | nindent 8 }}
+      annotations:
+        checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        # node im Image, damit das Volume für Uploads beschreibbar ist
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      containers:
+        - name: app
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 3000
+          env:
+            - name: APP_URL
+              value: {{ printf "https://%s" .Values.host | quote }}
+            - name: AUTH_ISSUER
+              value: {{ required "auth.issuer is required" .Values.auth.issuer | quote }}
+            {{- include "rezepte.secretEnv" (list . "AUTH_CLIENT_ID" "AUTH_CLIENT_ID") | nindent 12 }}
+            {{- include "rezepte.secretEnv" (list . "AUTH_CLIENT_SECRET" "AUTH_CLIENT_SECRET") | nindent 12 }}
+            {{- include "rezepte.secretEnv" (list . "AUTH_SECRET" "AUTH_SECRET") | nindent 12 }}
+            # liest pg direkt, kein Zusammenbauen einer URL (Sonderzeichen im Passwort)
+            - name: PGHOST
+              value: {{ $name }}-postgres
+            - name: PGPORT
+              value: "5432"
+            - name: PGUSER
+              value: {{ .Values.postgres.username | quote }}
+            - name: PGDATABASE
+              value: {{ .Values.postgres.database | quote }}
+            {{- include "rezepte.secretEnv" (list . "PGPASSWORD" "POSTGRES_PASSWORD") | nindent 12 }}
+            {{- with .Values.app.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          volumeMounts:
+            - name: uploads
+              mountPath: /app/public/uploads
+          # /api/health fragt die Datenbank, ohne Login
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            periodSeconds: 10
+          # nur der Port: fällt die Datenbank aus, hilft ein Neustart der App nicht
+          livenessProbe:
+            tcpSocket:
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 30
+          resources:
+            {{- toYaml .Values.app.resources | nindent 12 }}
+      volumes:
+        - name: uploads
+          persistentVolumeClaim:
+            claimName: {{ $name }}-uploads
