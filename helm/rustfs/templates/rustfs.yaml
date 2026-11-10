@@ -96,7 +96,8 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /data
-            # RustFS schreibt seine Logs in Dateien unter /logs (wie bisher), kubectl logs zeigt nur den Start
+            # das Entrypoint-Skript legt /logs an. RustFS kann die Rechte des emptyDir nicht auf 0755 setzen und
+            # schreibt die Logs deshalb nach stdout (Warnung "fallback_to_stdout"), so landen sie in kubectl logs
             - name: logs
               mountPath: /logs
           readinessProbe:

@@ -80,7 +80,8 @@ kubectl -n obsidian-web create secret generic obsidian-web-secrets \
   --from-literal=OAUTH2_PROXY_COOKIE_SECRET=...
 # nach einer Änderung am Secret: kubectl -n obsidian-web rollout restart deploy/obsidian-web
 
-# rustfs: Root-Zugang, dieselben Werte wie in ~/home/projects/rustfs/.env auf home-server
+# rustfs: Root-Zugang, dieselben Werte wie in ~/home/projects/rustfs/.env auf home-server. Vom Mac aus starten
+# (ssh holt die Werte). Direkt auf home-server nur den Teil in den einfachen Anführungszeichen, sonst bleiben sie leer
 kubectl create namespace rustfs --dry-run=client -o yaml | kubectl apply -f -
 ssh home-server 'cd ~/home/projects/rustfs && set -a && . ./.env && printf "RUSTFS_ACCESS_KEY=%s\nRUSTFS_SECRET_KEY=%s\n" "$RUSTFS_ACCESS_KEY" "$RUSTFS_SECRET_KEY"' \
   | kubectl -n rustfs create secret generic rustfs-secrets --from-env-file=/dev/stdin
