@@ -3,5 +3,4 @@
 # keys see helm/rustfs/templates/secret.yaml, created once by hand (argocd/README.md)
 secrets:
   existingSecret: rustfs-secrets
-# 0 until the data from docker compose is copied into the volume (argocd/README.md), then 1
-replicas: 0
+replicas: 1
