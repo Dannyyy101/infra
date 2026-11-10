@@ -1,0 +1,142 @@
+{{- $name := include "obsidian-web.fullname" . }}
+# Der Service zeigt nur auf oauth2-proxy. obsidian-web lauscht nur auf 127.0.0.1 im selben Pod:
+# sein /__proxy ist ein offener Proxy und darf nie ohne Anmeldung davor erreichbar sein, auch nicht
+# für andere Pods im Cluster.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "obsidian-web.labels" . | nindent 4 }}
+spec:
+  selector:
+    {{- include "obsidian-web.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: http
+      port: 4180
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "obsidian-web.labels" . | nindent 4 }}
+    {{- include "obsidian-web.selectorLabels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "obsidian-web.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "obsidian-web.selectorLabels" . | nindent 8 }}
+      annotations:
+        checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        runAsNonRoot: true
+      containers:
+        - name: app
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            # node im Image
+            runAsUser: 1000
+            runAsGroup: 1000
+            allowPrivilegeEscalation: false
+          env:
+            - name: HOST
+              value: "127.0.0.1"
+            - name: PORT
+              value: "3000"
+            - name: PROXY_ALLOWED_HOSTS
+              value: {{ required "app.proxyAllowedHosts is required" .Values.app.proxyAllowedHosts | quote }}
+            # wie bei rezepte: Node gibt jedem Verbindungsversuch nur 250 ms, der Weg über Cloudflare
+            # (z. B. zum S3 des Syncs) dauert oft länger und IPv6 gibt es im Cluster nicht
+            - name: NODE_OPTIONS
+              value: "--network-family-autoselection-attempt-timeout=2000"
+            {{- with .Values.app.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          # der Port ist nur im Pod erreichbar, ein httpGet des Kubelet käme nicht an
+          readinessProbe:
+            exec:
+              command: ["wget", "-qO-", "http://127.0.0.1:3000/healthz"]
+            periodSeconds: 10
+          livenessProbe:
+            exec:
+              command: ["wget", "-qO-", "http://127.0.0.1:3000/healthz"]
+            # beim Start lädt der Container erst noch die mitgelieferten Plugins
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          resources:
+            {{- toYaml .Values.app.resources | nindent 12 }}
+        - name: oauth2-proxy
+          image: "{{ .Values.oauth2Proxy.image.repository }}:{{ .Values.oauth2Proxy.image.tag }}"
+          imagePullPolicy: {{ .Values.oauth2Proxy.image.pullPolicy }}
+          securityContext:
+            # nonroot im distroless-Image
+            runAsUser: 65532
+            runAsGroup: 65532
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+          ports:
+            - name: http
+              containerPort: 4180
+          envFrom:
+            # OAUTH2_PROXY_CLIENT_ID, OAUTH2_PROXY_CLIENT_SECRET, OAUTH2_PROXY_COOKIE_SECRET
+            - secretRef:
+                name: {{ include "obsidian-web.secretName" . }}
+          env:
+            - name: OAUTH2_PROXY_PROVIDER
+              value: oidc
+            - name: OAUTH2_PROXY_OIDC_ISSUER_URL
+              value: {{ required "auth.issuer is required" .Values.auth.issuer | quote }}
+            - name: OAUTH2_PROXY_CODE_CHALLENGE_METHOD
+              value: S256
+            - name: OAUTH2_PROXY_SCOPE
+              value: openid email profile offline_access
+            - name: OAUTH2_PROXY_REDIRECT_URL
+              value: {{ printf "https://%s/oauth2/callback" .Values.host | quote }}
+            - name: OAUTH2_PROXY_UPSTREAMS
+              value: http://127.0.0.1:3000
+            - name: OAUTH2_PROXY_HTTP_ADDRESS
+              value: 0.0.0.0:4180
+            - name: OAUTH2_PROXY_REVERSE_PROXY
+              value: "true"
+            # wer rein darf, regelt Zitadel (Check authorization on Authentication + Rollen)
+            - name: OAUTH2_PROXY_EMAIL_DOMAINS
+              value: "*"
+            - name: OAUTH2_PROXY_COOKIE_SECURE
+              value: "true"
+            - name: OAUTH2_PROXY_COOKIE_DOMAINS
+              value: {{ .Values.host | quote }}
+            - name: OAUTH2_PROXY_COOKIE_EXPIRE
+              value: {{ .Values.oauth2Proxy.cookieExpire | quote }}
+            - name: OAUTH2_PROXY_COOKIE_REFRESH
+              value: {{ .Values.oauth2Proxy.cookieRefresh | quote }}
+            - name: OAUTH2_PROXY_SKIP_PROVIDER_BUTTON
+              value: "true"
+            {{- with .Values.oauth2Proxy.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          # /ping und /ready ohne Anmeldung
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /ping
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          resources:
+            {{- toYaml .Values.oauth2Proxy.resources | nindent 12 }}

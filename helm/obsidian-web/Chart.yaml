@@ -1,0 +1,6 @@
+apiVersion: v2
+name: obsidian-web
+description: obsidian-web (Obsidian im Browser) hinter oauth2-proxy, Anmeldung über Zitadel
+type: application
+version: 0.1.0
+appVersion: "latest"

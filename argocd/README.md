@@ -17,6 +17,7 @@ values/*.yaml             die Werte pro Komponente (Produktion, ohne Secrets)
 | `monitoring` | `prometheus-community/kube-prometheus-stack` | `monitoring` | `monitoring` |
 | `labs-101` | `deploy/helm/labs-101` aus dem App-Repo | `labs-101` | `labs-101` |
 | `rezepte` | `helm/rezepte` | `rezepte` | `rezepte` |
+| `obsidian-web` | `helm/obsidian-web` | `obsidian-web` | `obsidian-web` |
 
 Die Release-Namen entsprechen den bisherigen `helm install`, dadurch bleiben die Ressourcennamen gleich und
 Argo CD übernimmt die laufenden Ressourcen, statt sie neu anzulegen (wichtig für die PVCs der Datenbanken).
@@ -27,6 +28,9 @@ Ein Rollback ist ein `git revert` dieses Commits.
 
 **Deployments von rezepte:** genauso, die CI von `Dannyyy101/rezepte` (`.github/workflows/image.yaml`) schreibt
 `image.tag` in `values/rezepte.yaml`. Das Chart liegt hier unter `helm/rezepte`.
+
+**Deployments von obsidian-web:** genauso, die CI von `Dannyyy101/obsidian-web` (`.github/workflows/docker.yml`)
+schreibt `image.tag` in `values/obsidian-web.yaml`. Das Chart liegt hier unter `helm/obsidian-web`.
 
 ## Secrets
 
@@ -66,6 +70,14 @@ kubectl -n rezepte create secret generic rezepte-secrets \
   --from-literal=POSTGRES_PASSWORD="$(openssl rand -hex 24)" --from-literal=AUTH_SECRET="$(openssl rand -base64 32)" \
   --from-literal=AUTH_CLIENT_ID=... --from-literal=AUTH_CLIENT_SECRET=...
 # nach einer Änderung am Secret: kubectl -n rezepte rollout restart deploy/rezepte
+
+# obsidian-web: dieselben Werte wie in deploy/.env auf home-server (ZITADEL_CLIENT_ID, ZITADEL_CLIENT_SECRET,
+# COOKIE_SECRET), der Client in Zitadel bleibt derselbe, weil sich der Host nicht ändert
+kubectl create namespace obsidian-web
+kubectl -n obsidian-web create secret generic obsidian-web-secrets \
+  --from-literal=OAUTH2_PROXY_CLIENT_ID=... --from-literal=OAUTH2_PROXY_CLIENT_SECRET=... \
+  --from-literal=OAUTH2_PROXY_COOKIE_SECRET=...
+# nach einer Änderung am Secret: kubectl -n obsidian-web rollout restart deploy/obsidian-web
 ```
 
 Den Namen des bisherigen Zitadel-Secrets vorher mit `kubectl -n auth get secrets` prüfen.
@@ -120,6 +132,7 @@ Im Dashboard (Modus `token`) unter Public Hostnames:
 | `api.project101.tech` | `http://labs-101-backend.labs-101.svc.cluster.local:8080` (erst beim Umzug) |
 | `project101.tech` | `http://labs-101-frontend.labs-101.svc.cluster.local:3000` (erst beim Umzug) |
 | `rezepte.project101.tech` | `http://rezepte.rezepte.svc.cluster.local:3000` |
+| `notes.project101.tech` | `http://obsidian-web.obsidian-web.svc.cluster.local:4180` (erst beim Umzug) |
 
 Der Management-Port des Backends (9090, `/actuator`) bekommt bewusst keine Route.
 
@@ -173,3 +186,18 @@ tar -C ~/home/projects/rezepte/public/uploads --exclude=.gitkeep -cf - . \
 
 Danach die Route `rezepte.project101.tech` im Tunnel auf den Service umstellen und `docker compose down` in
 `~/home/projects/rezepte` (das Volume `rezepte_rezepte-daten` erst nach ein paar Tagen löschen).
+
+## Umzug von obsidian-web aus docker compose
+
+obsidian-web läuft noch per `docker compose` auf home-server (`~/home/projects/obsidian-web/deploy`, Container
+`deploy-obsidian-web-1` und `deploy-oauth2-proxy-1`, der Tunnel zeigt auf `http://127.0.0.1:4180`). Es gibt keine
+Daten zu übertragen: der Vault liegt im Browser und im S3 des Syncs (`s3.project101.tech`).
+
+1. Secret `obsidian-web-secrets` anlegen (oben), Argo CD synchronisiert die Application dann selbst.
+2. Prüfen, dass der Pod läuft: `kubectl -n obsidian-web get pods` (2/2 Ready).
+3. Route `notes.project101.tech` im Tunnel auf den Service umstellen. Mit demselben Cookie-Secret bleiben die
+   Anmeldungen gültig.
+4. `docker compose down` in `~/home/projects/obsidian-web/deploy`.
+
+Der Container von obsidian-web lauscht im Pod nur auf `127.0.0.1`, erreichbar ist allein oauth2-proxy: `/__proxy`
+ist ein offener Proxy und darf nie ohne Anmeldung davor erreichbar sein.

@@ -1,0 +1,8 @@
+# obsidian-web in production (chart helm/obsidian-web). image.tag is written by the CI of the app repo
+# (Dannyyy101/obsidian-web, workflow docker.yml), every change of it is a commit here and argo cd deploys exactly that build
+host: notes.project101.tech
+# keys see helm/obsidian-web/templates/secret.yaml, created once by hand (argocd/README.md)
+secrets:
+  existingSecret: obsidian-web-secrets
+image:
+  tag: sha-52a8a52

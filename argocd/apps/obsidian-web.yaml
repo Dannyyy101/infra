@@ -1,0 +1,29 @@
+# obsidian-web behind oauth2-proxy (login with zitadel), stateless: the vault lives in the browser and in the s3 of the sync.
+# The CI of Dannyyy101/obsidian-web writes the image tag into values/obsidian-web.yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: obsidian-web
+  namespace: argocd
+spec:
+  project: default
+  sources:
+    - repoURL: https://github.com/Dannyyy101/infra.git
+      targetRevision: main
+      path: helm/obsidian-web
+      helm:
+        releaseName: obsidian-web
+        valueFiles:
+          - $values/values/obsidian-web.yaml
+    - repoURL: https://github.com/Dannyyy101/infra.git
+      targetRevision: main
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: obsidian-web
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
