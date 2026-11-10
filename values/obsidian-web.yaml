@@ -5,4 +5,4 @@ host: notes.project101.tech
 secrets:
   existingSecret: obsidian-web-secrets
 image:
-  tag: sha-52a8a52
+  tag: sha-359aca4
