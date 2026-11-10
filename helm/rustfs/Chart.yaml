@@ -1,0 +1,6 @@
+apiVersion: v2
+name: rustfs
+description: RustFS, S3-kompatibler Objektspeicher für alle Apps im Cluster (ein Knoten, ein Volume)
+type: application
+version: 0.1.0
+appVersion: "1.0.4"

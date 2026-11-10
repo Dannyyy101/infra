@@ -1,0 +1,29 @@
+# s3 compatible object storage for every app of the cluster (e.g. the sync of obsidian-web), one node, one volume
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: rustfs
+  namespace: argocd
+spec:
+  project: default
+  sources:
+    - repoURL: https://github.com/Dannyyy101/infra.git
+      targetRevision: main
+      path: helm/rustfs
+      helm:
+        releaseName: rustfs
+        valueFiles:
+          - $values/values/rustfs.yaml
+    - repoURL: https://github.com/Dannyyy101/infra.git
+      targetRevision: main
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: rustfs
+  syncPolicy:
+    automated:
+      # stateful (the objects), removed resources are only reported, deleting them stays a manual decision
+      prune: false
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

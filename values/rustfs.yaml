@@ -1,0 +1,7 @@
+# rustfs in production (chart helm/rustfs), the s3 storage of the cluster, shared by every app that needs one.
+# Version: appVersion of the chart, change image.tag here to update
+# keys see helm/rustfs/templates/secret.yaml, created once by hand (argocd/README.md)
+secrets:
+  existingSecret: rustfs-secrets
+# 0 until the data from docker compose is copied into the volume (argocd/README.md), then 1
+replicas: 0

@@ -18,6 +18,7 @@ values/*.yaml             die Werte pro Komponente (Produktion, ohne Secrets)
 | `labs-101` | `deploy/helm/labs-101` aus dem App-Repo | `labs-101` | `labs-101` |
 | `rezepte` | `helm/rezepte` | `rezepte` | `rezepte` |
 | `obsidian-web` | `helm/obsidian-web` | `obsidian-web` | `obsidian-web` |
+| `rustfs` | `helm/rustfs` | `rustfs` | `rustfs` |
 
 Die Release-Namen entsprechen den bisherigen `helm install`, dadurch bleiben die Ressourcennamen gleich und
 Argo CD übernimmt die laufenden Ressourcen, statt sie neu anzulegen (wichtig für die PVCs der Datenbanken).
@@ -78,6 +79,11 @@ kubectl -n obsidian-web create secret generic obsidian-web-secrets \
   --from-literal=OAUTH2_PROXY_CLIENT_ID=... --from-literal=OAUTH2_PROXY_CLIENT_SECRET=... \
   --from-literal=OAUTH2_PROXY_COOKIE_SECRET=...
 # nach einer Änderung am Secret: kubectl -n obsidian-web rollout restart deploy/obsidian-web
+
+# rustfs: Root-Zugang, dieselben Werte wie in ~/home/projects/rustfs/.env auf home-server
+kubectl create namespace rustfs --dry-run=client -o yaml | kubectl apply -f -
+ssh home-server 'cd ~/home/projects/rustfs && set -a && . ./.env && printf "RUSTFS_ACCESS_KEY=%s\nRUSTFS_SECRET_KEY=%s\n" "$RUSTFS_ACCESS_KEY" "$RUSTFS_SECRET_KEY"' \
+  | kubectl -n rustfs create secret generic rustfs-secrets --from-env-file=/dev/stdin
 ```
 
 Den Namen des bisherigen Zitadel-Secrets vorher mit `kubectl -n auth get secrets` prüfen.
@@ -133,8 +139,10 @@ Im Dashboard (Modus `token`) unter Public Hostnames:
 | `project101.tech` | `http://labs-101-frontend.labs-101.svc.cluster.local:3000` (erst beim Umzug) |
 | `rezepte.project101.tech` | `http://rezepte.rezepte.svc.cluster.local:3000` |
 | `notes.project101.tech` | `http://obsidian-web.obsidian-web.svc.cluster.local:4180` (erst beim Umzug) |
+| `s3.project101.tech` | `http://rustfs.rustfs.svc.cluster.local:9000` (erst beim Umzug) |
 
-Der Management-Port des Backends (9090, `/actuator`) bekommt bewusst keine Route.
+Der Management-Port des Backends (9090, `/actuator`) bekommt bewusst keine Route, die Konsole von RustFS (9001)
+auch nicht: `kubectl -n rustfs port-forward svc/rustfs 9001`, dann http://localhost:9001/rustfs/console/.
 
 ## Umzug von labs-101 aus docker compose
 
@@ -201,3 +209,49 @@ Daten zu übertragen: der Vault liegt im Browser und im S3 des Syncs (`s3.projec
 
 Der Container von obsidian-web lauscht im Pod nur auf `127.0.0.1`, erreichbar ist allein oauth2-proxy: `/__proxy`
 ist ein offener Proxy und darf nie ohne Anmeldung davor erreichbar sein.
+
+## RustFS (S3)
+
+Eigenständig, damit jede App den Speicher nutzen kann: im Cluster unter
+`http://rustfs.rustfs.svc.cluster.local:9000`, von außen (z. B. aus dem Browser beim Sync von obsidian-web) unter
+`https://s3.project101.tech`. Für eine neue App in der Konsole einen eigenen Access Key mit Policy auf ihre Buckets
+anlegen, nicht den Root-Zugang weitergeben.
+
+Ein Update ist ein Commit von `image.tag` in `values/rustfs.yaml` (Tags auf Docker Hub `rustfs/rustfs`).
+
+## Umzug von RustFS aus docker compose
+
+RustFS läuft per `docker compose` auf home-server (`~/home/projects/rustfs`, Container `rustfs`, Daten unter
+`data/`, ein Bucket `obsidian`, ~200 MB). Kopiert wird das Datenverzeichnis als Ganzes, damit Buckets, Nutzer,
+Access Keys und Policies (`data/.rustfs.sys`) mitkommen. Dafür darf auf keiner Seite ein RustFS laufen:
+`values/rustfs.yaml` steht anfangs auf `replicas: 0`.
+
+1. Secret `rustfs-secrets` anlegen (oben) und pushen. Argo CD legt Service und Volume an, aber keinen Pod.
+2. Hilfs-Pod, der das Volume einbindet (damit wird es auch erst angelegt):
+
+   ```sh
+   kubectl -n rustfs run rustfs-restore --image=busybox:1.37 --restart=Never --overrides='{"spec":{
+     "securityContext":{"runAsUser":10001,"runAsGroup":10001,"fsGroup":10001},
+     "containers":[{"name":"restore","image":"busybox:1.37","command":["sleep","3600"],
+       "volumeMounts":[{"name":"data","mountPath":"/data"}]}],
+     "volumes":[{"name":"data","persistentVolumeClaim":{"claimName":"rustfs-data"}}]}}'
+   kubectl -n rustfs wait --for=condition=Ready pod/rustfs-restore
+   ```
+
+3. Wartungsfenster: RustFS in compose stoppen (ab jetzt schlägt der Sync von obsidian-web fehl) und kopieren:
+
+   ```sh
+   ssh home-server 'cd ~/home/projects/rustfs && docker compose stop'
+   ssh home-server 'tar -C ~/home/projects/rustfs/data -cf - .' \
+     | kubectl -n rustfs exec -i rustfs-restore -- tar -C /data -xf -
+   kubectl -n rustfs exec rustfs-restore -- du -sh /data   # etwa so groß wie auf home-server
+   kubectl -n rustfs delete pod rustfs-restore
+   ```
+
+4. In `values/rustfs.yaml` `replicas: 1` setzen und pushen, warten bis der Pod Ready ist, dann prüfen, dass der
+   Bucket da ist (Konsole per port-forward, oben).
+5. Route `s3.project101.tech` im Tunnel auf den Service umstellen. Der Sync von obsidian-web läuft wieder.
+6. `docker compose down` in `~/home/projects/rustfs`, `data/` erst nach ein paar Tagen ohne Probleme löschen.
+
+Rückweg bis Schritt 6: Route zurück auf home-server stellen und `docker compose start`. Was in der Zwischenzeit
+im Cluster hochgeladen wurde, fehlt dann dort.
